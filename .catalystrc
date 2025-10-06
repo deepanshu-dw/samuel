@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "project": 1,
+    "env": 1
+  },
+  "actives": {
+    "project": 1,
+    "env": 1
+  },
+  "projects": [
+    {
+      "idx": 1,
+      "id": "5925000000014019",
+      "name": "VisaTracking",
+      "domain": {
+        "id": "30036629332",
+        "name": "visatracking.development"
+      },
+      "timezone": "Asia/Kolkata",
+      "env": [
+        {
+          "idx": 1,
+          "id": "20109217109",
+          "name": "Development",
+          "type": 3
+        }
+      ]
+    }
+  ]
+}
