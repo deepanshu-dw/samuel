@@ -1,6 +1,7 @@
 const express = require('express');
 require("dotenv").config();
 
+const mongoConnection = require("./src/configs/mongo.config.js")
 const userRoutes = require("./src/routes/user.route.js")
 
 const app = express();
@@ -16,7 +17,8 @@ app.get('/', (req, res) => {
   res.send('Hello World!')
 });
 
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
-  console.log(`http://localhost:${port}/`);
+app.listen(port, async () => {
+  await mongoConnection();
+  console.log(`✅ Server is listening on port ${port}`);
+  // console.log(`http://localhost:${port}/`);
 });

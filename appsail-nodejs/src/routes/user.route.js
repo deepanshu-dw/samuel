@@ -7,4 +7,7 @@ router.post("/login", userController.userLogin);
 
 router.get("/profile/:id", userController.getUserProfile);
 
+router.put("/edit/:id", userController.editUserProfile);
+
+
 module.exports = router;

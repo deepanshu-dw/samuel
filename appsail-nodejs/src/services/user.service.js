@@ -10,12 +10,13 @@ const userLoginService = async (loginId) => {
         const criteria = isEmail
             ? `(Email:equals:${loginId})`
             : `(Phone:equals:${loginId} or Mobile:equals:${loginId})`;
-
+        console.log("before data ccess of zoho", Date.now())
         const { data } = await axios.get(
             `${process.env.ZOHO_API_BASE}/Contacts/search?criteria=${encodeURIComponent(criteria)}`,
             { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
         );
-
+        console.log("after data ccess of zoho", Date.now())
+        console.log("data: ", data)
         if (data?.data?.length > 0) return data.data[0];
         return null;
     } catch (err) {
@@ -24,20 +25,23 @@ const userLoginService = async (loginId) => {
     }
 };
 
-const getUserByIdService = async (contactId) => {
-    try {
-        const token = await getAccessToken();
-        const { data } = await axios.get(
-            `${process.env.ZOHO_API_BASE}/Contacts/${contactId}`,
-            { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
-        );
+// const getUserByIdService = async (contactId) => {
+//     try {
+//         const token = await getAccessToken();
+//         const { data } = await axios.get(
+//             `${process.env.ZOHO_API_BASE}/Contacts/${contactId}`,
+//             { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
+//         );
 
-        // Zoho API returns 'data' array
-        return data?.data?.length ? data.data[0] : null;
-    } catch (err) {
-        console.error("Error fetching user by ID:", err.response?.data || err.message);
-        return null;
-    }
-};
+//         // Zoho API returns 'data' array
+//         return data?.data?.length ? data.data[0] : null;
+//     } catch (err) {
+//         console.error("Error fetching user by ID:", err.response?.data || err.message);
+//         return null;
+//     }
+// };
 
-module.exports = { userLoginService, getUserByIdService }
+module.exports = {
+    userLoginService,
+    // getUserByIdService
+}
