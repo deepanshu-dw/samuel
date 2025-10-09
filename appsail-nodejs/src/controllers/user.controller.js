@@ -161,6 +161,47 @@ const editUserProfile = async (req, res) => {
     }
 };
 
+const acroReport = async (req, res) => {
+    try {
+        const result = await userService.acroReportService(req);
+
+        return res.status(result.statusCode).json({
+            message: result.message,
+            data: result.data,
+            success: result.success,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (err) {
+        console.error("editUserProfile Error:", err);
+        return res.status(500).json({
+            message: "Internal server error",
+            data: null,
+            success: false,
+            timestamp: new Date().toISOString(),
+        });
+    }
+}
+
+const blsAppointment = async (req, res) => {
+    try {
+        const result = await userService.blsAppointmentService(req);
+        return res.status(result.statusCode).json({
+            message: result.message,
+            data: result.data,
+            success: result.success,
+            timestamp: new Date().toISOString()
+        });
+    } catch (err) {
+        console.error("🔥 blsAppointment Controller Error:", err);
+        return res.status(500).json({
+            message: "Unexpected server error.",
+            data: null,
+            success: false,
+            timestamp: new Date().toISOString()
+        });
+    }
+};
+
 //not in work as of now.
 // const updateProfile = async (req, res) => {
 //     const url = "https://static.vecteezy.com/system/resources/previews/032/176/197/non_2x/business-avatar-profile-black-icon-man-of-user-symbol-in-trendy-flat-style-isolated-on-male-profile-people-diverse-face-for-social-network-or-web-vector.jpg";
@@ -211,5 +252,7 @@ const editUserProfile = async (req, res) => {
 module.exports = {
     userLogin,
     getUserProfile,
-    editUserProfile
+    editUserProfile,
+    acroReport,
+    blsAppointment
 };

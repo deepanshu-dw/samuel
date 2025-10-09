@@ -252,8 +252,229 @@ const editUserProfileService = async (req) => {
     };
 };
 
+const acroReportService = async (req) => {
+    const token = await getAccessToken();
+    console.log("token: ", token);
+    // const response = await axios.get(
+    //     `${process.env.ZOHO_API_BASE}/settings/fields?module=Contacts`,
+    //     { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
+    // );
+
+    // console.log(response);
+    // return response;
+}
+
+// const blsAppointmentService = async (req) => {
+//     const { userId, date } = req.body;
+
+//     if (!userId || !date) {
+//         return {
+//             statusCode: 400,
+//             message: "userId and date are required",
+//             data: null,
+//             success: false
+//         };
+//     }
+//     console.log("userId, date: ", userId, date)
+//     const user = await userModel.findById(userId);
+//     console.log("user: ", user)
+//     if (!user) {
+//         return {
+//             statusCode: 404,
+//             message: "No user found",
+//             data: null,
+//             success: false
+//         };
+//     }
+
+//     try {
+//         const token = await getAccessToken();
+//         const response = await axios.post(`${process.env.ZOHO_API_BASE}/Tasks`, {
+//             data: [{
+//                 Subject: `${user.fullName} booked BLS Appointment`,
+//                 Due_Date: date,
+//                 // What_Id: { id: '45556000062001234' }, // Optional: related to Deal/Account
+//                 Who_Id: { id: user.zohoUserId }, // Optional: related Contact/Lead
+//                 // Owner: { id: '45556000059725012' }, // Task owner
+//                 Status: 'Not Started',
+//                 Priority: 'Normal',
+//                 Description: `Client has booken this appointment for ${date}`
+//             }]
+//         }, {
+//             headers: {
+//                 Authorization: `Zoho-oauthtoken ${token}`,
+//                 'Content-Type': 'application/json'
+//             }
+//         });
+
+//         const appointment = response.data?.data?.length ? response.data.data[0] : null;
+//         // let appointment = false
+//         if (!appointment) {
+//             return {
+//                 statusCode: 500,
+//                 message: "Failed to book appointment in Zoho",
+//                 data: null,
+//                 success: false
+//             };
+//         }
+
+//         return {
+//             statusCode: 200,
+//             message: "Appointment booked successfully",
+//             data: appointment,
+//             success: true
+//         };
+
+//     } catch (err) {
+//         console.log(err)
+//         // console.error("bookAppointmentService Error:", err.response?.data || err.message);
+//         return {
+//             statusCode: 500,
+//             message: "Internal server error",
+//             data: null,
+//             success: false
+//         };
+//     }
+// };
+
+const blsAppointmentService = async (req) => {
+    try {
+        const { userId, bookingDate, bookingTime } = req.body;
+
+        // 🔹 1. Validate input
+        if (!userId || typeof userId !== "string") {
+            return {
+                statusCode: 400,
+                message: "A valid 'userId' is required.",
+                data: null,
+                success: false
+            };
+        }
+
+        if (!bookingDate || isNaN(Date.parse(bookingDate))) {
+            return {
+                statusCode: 400,
+                message: "A valid appointment 'date' (ISO format) is required.",
+                data: null,
+                success: false
+            };
+        }
+        // 🔹 2.5. Validate bookingTime (must be in HH:mm format, 24-hour)
+        const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+        if (!bookingTime || !timeRegex.test(bookingTime)) {
+            return {
+                statusCode: 400,
+                message: "A valid 'bookingTime' (HH:mm, 24-hour format) is required.",
+                data: null,
+                success: false
+            };
+        }
+
+        // ✅ Optional: Combine into full ISO datetime for storage or Zoho
+        const combinedDateTime = new Date(`${bookingDate}T${bookingTime}:00.000Z`);
+        if (isNaN(combinedDateTime.getTime())) {
+            return {
+                statusCode: 400,
+                message: "Invalid date or time combination.",
+                data: null,
+                success: false
+            };
+        }
+
+
+        // console.log("📅 Booking BLS appointment for user:", userId, "on", bookingDate);
+
+        // 🔹 2. Fetch user
+        const user = await userModel.findById(userId);
+        if (!user) {
+            return {
+                statusCode: 404,
+                message: "User not found.",
+                data: null,
+                success: false
+            };
+        }
+
+        if (!user.zohoUserId) {
+            return {
+                statusCode: 400,
+                message: "User is not linked to a Zoho contact (missing zohoUserId).",
+                data: null,
+                success: false
+            };
+        }
+
+        // 🔹 3. Get Zoho Access Token
+        const token = await getAccessToken();
+        if (!token) {
+            return {
+                statusCode: 500,
+                message: "Unable to retrieve Zoho access token.",
+                data: null,
+                success: false
+            };
+        }
+
+        // 🔹 4. Build Zoho Task Payload
+        const payload = {
+            data: [
+                {
+                    Subject: `${user.fullName || "Client"} booked BLS Appointment`,
+                    Due_Date: new Date(bookingDate).toISOString().split("T")[0], // Zoho expects yyyy-MM-dd
+                    Who_Id: { id: user.zohoUserId },
+                    Status: "Not Started",
+                    Priority: "Normal",
+                    Description: `${user.fullName || "User"} booked an appointment for ${bookingDate} at ${bookingTime}.`
+                }
+            ]
+        };
+
+        // 🔹 5. Send request to Zoho CRM
+        const response = await axios.post(
+            `${process.env.ZOHO_API_BASE}/Tasks`,
+            payload,
+            {
+                headers: {
+                    Authorization: `Zoho-oauthtoken ${token}`,
+                    "Content-Type": "application/json"
+                },
+            }
+        );
+
+        const resultData = response.data?.data?.[0];
+
+        if (!resultData || resultData.code !== "SUCCESS") {
+            console.error("❌ Zoho appointment creation failed:", response.data);
+            return {
+                statusCode: 500,
+                message: "Failed to book appointment in Zoho CRM.",
+                data: response.data,
+                success: false
+            };
+        }
+
+        return {
+            statusCode: 200,
+            message: "Appointment booked successfully in Zoho CRM.",
+            data: resultData.details,
+            success: true
+        };
+
+    } catch (err) {
+        console.error("🔥 blsAppointmentService Error:", err.response?.data || err.message);
+        return {
+            statusCode: 500,
+            message: "Internal server error while booking appointment.",
+            data: err.response?.data || null,
+            success: false
+        };
+    }
+};
+
 module.exports = {
     userLoginService,
     getUserProfileService,
-    editUserProfileService
+    editUserProfileService,
+    acroReportService,
+    blsAppointmentService,
 }
