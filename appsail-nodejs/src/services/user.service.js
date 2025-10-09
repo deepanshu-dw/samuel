@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 
 
 const userModel = require("../models/user.model");
+const otpModel = require("../models/otp.model");
 
 // const userLoginService = async (loginId) => {
 //     try {
@@ -46,59 +47,250 @@ const userModel = require("../models/user.model");
 //     }
 // };
 
+// const userLoginService = async (req) => {
+//     const { loginId, password } = req.body;
+//     console.log("nside login service ")
+//     // 🔹 Step 1: Validate input
+//     if (!loginId || !password) {
+//         return {
+//             statusCode: 400,
+//             message: "loginId and password are required",
+//             data: null,
+//             success: false,
+//         };
+//     }
+
+//     // 🔹 Step 2: Identify if loginId is email or phone
+//     const isEmail = /\S+@\S+\.\S+/.test(loginId);
+//     const query = isEmail ? { email: loginId.toLowerCase() } : { mobile: loginId };
+
+//     // 🔹 Step 3: Find user from DB
+//     const user = await userModel.findOne(query);
+//     if (!user) {
+//         return {
+//             statusCode: 404,
+//             message: "User not found",
+//             data: null,
+//             success: false,
+//         };
+//     }
+
+//     // 🔹 Step 4: Compare password
+//     const isPasswordValid = await bcrypt.compare(password, user.password);
+//     if (!isPasswordValid) {
+//         return {
+//             statusCode: 401,
+//             message: "Invalid password",
+//             data: null,
+//             success: false,
+//         };
+//     }
+
+//     // 🔹 Step 5: If everything is fine → return success
+//     return {
+//         statusCode: 200,
+//         message: "Login successful",
+//         data: {
+//             id: user._id,
+//             fullName: user.fullName,
+//             email: user.email,
+//             phone: user.phone,
+//             zohoUserId: user.zohoUserId,
+//             status: user.status,
+//         },
+//         success: true,
+//     };
+// };
+// Helper: Generate 6-digit OTP
+const generateOtp = () => Math.floor(100000 + Math.random() * 900000);
+
+// ✅ MAIN SERVICE
 const userLoginService = async (req) => {
-    const { loginId, password } = req.body;
-    console.log("nside login service ")
-    // 🔹 Step 1: Validate input
-    if (!loginId || !password) {
+    try {
+        const { loginId } = req.body;
+
+        // 🔹 Step 1: Validate input
+        if (!loginId) {
+            return {
+                statusCode: 400,
+                message: "Email is required",
+                success: false,
+                data: null,
+            };
+        }
+
+        // 🔹 Step 2: Validate email format
+        const isEmailValid = /\S+@\S+\.\S+/.test(loginId);
+        if (!isEmailValid) {
+            return {
+                statusCode: 400,
+                message: "Invalid email format",
+                success: false,
+                data: null,
+            };
+        }
+
+        const email = loginId.toLowerCase();
+
+        // 🔹 Step 3: Check user in local DB
+        let user = await userModel.findOne({ email, status: "Active" });
+
+        // 🔹 Step 4: If not found, fetch from Zoho CRM
+        if (!user) {
+            try {
+                const token = await getAccessToken();
+
+                const criteria = `(Email:equals:${email})`;
+                const { data } = await axios.get(
+                    `${process.env.ZOHO_API_BASE}/Contacts/search?criteria=${encodeURIComponent(criteria)}`,
+                    {
+                        headers: { Authorization: `Zoho-oauthtoken ${token}` },
+                    }
+                );
+
+                if (data?.data?.length > 0) {
+                    const zohoUser = data.data[0];
+
+                    // 🟢 Step 4.1: Save user to local DB
+                    const newUser = new userModel({
+                        firstName: zohoUser.First_Name || null,
+                        lastName: zohoUser.Last_Name || null,
+                        fullName: zohoUser.Full_Name || null,
+                        email: zohoUser.Email || null,
+                        mobile: zohoUser.Mobile || zohoUser.Phone || null,
+                        nationality: zohoUser.Nationality || null,
+                        dateOfBirth: zohoUser.Date_of_Birth || null,
+                        zohoUserId: zohoUser.id,
+                        profileImage: zohoUser.Profile_Image || null,
+                        visaRefused: zohoUser.F_T_Turned_Down_No_Need || false,
+                        passportNo: zohoUser.Passport_Number || null,
+                        dropBoxFolderId: zohoUser.dropboxextension__Dropbox_Folder_ID,
+                        status: zohoUser.Status || "Inactive",
+                    });
+                    user = await newUser.save();
+                } else {
+                    return {
+                        statusCode: 404,
+                        message: "User not found.",
+                        success: false,
+                        data: null,
+                    };
+                }
+            } catch (zohoErr) {
+                console.error("Error fetching user from Zoho:", zohoErr.response?.data || zohoErr.message);
+                return {
+                    statusCode: 500,
+                    message: "Error fetching user from Zoho CRM",
+                    success: false,
+                    data: null,
+                };
+            }
+        }
+
+        // 🔹 Step 5: Generate OTP and upsert in DB
+        const otpValue = 123456 //generateOtp();
+
+        await otpModel.findOneAndUpdate(
+            { email },
+            { otp: otpValue },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+
+        // 🔹 Step 6: Return success response
         return {
-            statusCode: 400,
-            message: "loginId and password are required",
-            data: null,
+            statusCode: 200,
+            message: "User found. Please verify using the OTP sent to your email.",
+            success: true,
+            data: {
+                email,
+                otp: otpValue, // show for testing only
+                userId: user._id,
+            },
+        };
+    } catch (error) {
+        console.error("Error in userLoginService:", error);
+        return {
+            statusCode: 500,
+            message: "Internal Server Error",
             success: false,
+            data: null,
         };
     }
+};
 
-    // 🔹 Step 2: Identify if loginId is email or phone
-    const isEmail = /\S+@\S+\.\S+/.test(loginId);
-    const query = isEmail ? { email: loginId.toLowerCase() } : { mobile: loginId };
+const verifyOtpService = async (req) => {
+    try {
+        const { email, otp } = req.body;
 
-    // 🔹 Step 3: Find user from DB
-    const user = await userModel.findOne(query);
-    if (!user) {
+        // 🧩 Step 1: Validate input
+        if (!email || !otp) {
+            return {
+                statusCode: 400,
+                message: "Email and OTP are required",
+                success: false,
+                data: null
+            };
+        }
+
+        // 🧩 Step 2: Check user existence
+        const user = await userModel.findOne({ email: email.toLowerCase(), status: "Active" });
+        if (!user) {
+            return {
+                statusCode: 404,
+                message: "User not found",
+                success: false,
+                data: null
+            };
+        }
+
+        // 🧩 Step 3: Fetch OTP record
+        const otpRecord = await otpModel.findOne({ email: email.toLowerCase() });
+        if (!otpRecord) {
+            return {
+                statusCode: 404,
+                message: "OTP not found or expired",
+                success: false,
+                data: null
+            };
+        }
+
+        // 🧩 Step 4: Validate OTP
+        if (otpRecord.otp !== Number(otp)) {
+            return {
+                statusCode: 400,
+                message: "Invalid OTP",
+                success: false,
+                data: null
+            };
+        }
+
+        // 🧩 Step 5: Delete only this OTP record (strict delete)
+        await otpModel.deleteOne({ _id: otpRecord._id });
+        await userModel.findByIdAndUpdate(user._id, { active: true })
+        // 🧩 Step 6: Respond success
         return {
-            statusCode: 404,
-            message: "User not found",
-            data: null,
+            statusCode: 200,
+            message: "OTP verified successfully",
+            success: true,
+            data: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+                phone: user.phone,
+                zohoUserId: user.zohoUserId,
+                status: user.status
+            }
+        };
+
+    } catch (error) {
+        console.error("Error verifying OTP:", error);
+        return {
+            statusCode: 500,
+            message: "Internal server error",
             success: false,
+            data: null
         };
     }
-
-    // 🔹 Step 4: Compare password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-        return {
-            statusCode: 401,
-            message: "Invalid password",
-            data: null,
-            success: false,
-        };
-    }
-
-    // 🔹 Step 5: If everything is fine → return success
-    return {
-        statusCode: 200,
-        message: "Login successful",
-        data: {
-            id: user._id,
-            fullName: user.fullName,
-            email: user.email,
-            phone: user.phone,
-            zohoUserId: user.zohoUserId,
-            status: user.status,
-        },
-        success: true,
-    };
 };
 
 const getUserProfileService = async (req) => {
@@ -115,7 +307,7 @@ const getUserProfileService = async (req) => {
     }
 
     // 🔹 Step 2: Find user by ID
-    const user = await userModel.findById(id).lean();
+    const user = await userModel.findOne({ _id: id, active: true }).lean();
 
     if (!user) {
         return {
@@ -190,7 +382,7 @@ const editUserProfileService = async (req) => {
     }
 
     // 🔹 Step 4: Fetch user from MongoDB
-    const user = await userModel.findById(id).lean();
+    const user = await userModel.findOne({ _id: id, active: true }).lean();
     if (!user) {
         return {
             statusCode: 404,
@@ -385,7 +577,7 @@ const blsAppointmentService = async (req) => {
         // console.log("📅 Booking BLS appointment for user:", userId, "on", bookingDate);
 
         // 🔹 2. Fetch user
-        const user = await userModel.findById(userId);
+        const user = await userModel.findOne({ _id: userId, active: true });
         if (!user) {
             return {
                 statusCode: 404,
@@ -473,6 +665,7 @@ const blsAppointmentService = async (req) => {
 
 module.exports = {
     userLoginService,
+    verifyOtpService,
     getUserProfileService,
     editUserProfileService,
     acroReportService,

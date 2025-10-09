@@ -119,6 +119,27 @@ const userLogin = async (req, res) => {
     }
 };
 
+const verifyOtp = async (req, res) => {
+    try {
+        const result = await userService.verifyOtpService(req);
+
+        return res.status(result.statusCode).json({
+            message: result.message,
+            data: result.data,
+            success: result.success,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (err) {
+        console.error("Verify OTP Error:", err);
+        return res.status(500).json({
+            message: "Internal server error",
+            data: null,
+            success: false,
+            timestamp: new Date().toISOString(),
+        });
+    }
+};
+
 const getUserProfile = async (req, res) => {
     try {
         const result = await userService.getUserProfileService(req);
@@ -251,6 +272,7 @@ const blsAppointment = async (req, res) => {
 
 module.exports = {
     userLogin,
+    verifyOtp,
     getUserProfile,
     editUserProfile,
     acroReport,

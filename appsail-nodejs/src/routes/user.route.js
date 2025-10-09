@@ -5,6 +5,8 @@ const router = express.Router();
 
 router.post("/login", userController.userLogin);
 
+router.post("/verify-otp", userController.verifyOtp);
+
 router.get("/profile/:id", userController.getUserProfile);
 
 router.put("/edit/:id", userController.editUserProfile);
