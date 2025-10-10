@@ -696,6 +696,68 @@ const blsAppointmentService = async (req) => {
     }
 };
 
+const dashboardProgressTrackerService = async (req) => {
+    try {
+        const { userId } = req.params;
+        if (!userId) return { success: false, message: "User ID is required." };
+
+        // Step 1: Find user
+        const user = await userModel.findOne({ _id: userId, active: true });
+        if (!user) return { success: false, message: "User not found or inactive." };
+
+        // Step 2: Check required profile fields
+        const requiredFields = ["fullName", "email", "mobile", "nationality", "dateOfBirth", "zohoUserId", "passportNo"];
+        let profileComplete = true;
+
+        for (let field of requiredFields) {
+            if (!user[field] || user[field].toString().trim() === "") {
+                profileComplete = false;
+                break;
+            }
+        }
+
+        // Step 3: Get documents uploaded by user
+        const documents = await documentModel.findOne({ userId });
+        let uploadedDocsCount = 0;
+        const totalDocs = 9; // Total expected docs
+
+        if (documents) {
+            const docFields = [
+                "passport",
+                "proofOfAccomodation",
+                "proofOfIdentity",
+                "passportSizePhoto",
+                "bankStatement",
+                "healthCertificate",
+                "criminalRecord",
+                "employmentLetter",
+                "travelItinerary",
+            ];
+
+            docFields.forEach((field) => {
+                if (documents[field] && documents[field].length > 0) uploadedDocsCount++;
+            });
+        }
+
+        // Step 4: Prepare dashboard response
+        const dashboard = {
+            userId: user._id,
+            firstName: user.fullName.split(" ")[0] || "",
+            profileSetup: profileComplete ? "completed" : "pending",
+            policeReport: "pending",
+            bls: "pending",
+            healthCertificate: "pending",
+            totalUploadedDoc: uploadedDocsCount,
+            totalDoc: totalDocs,
+        };
+
+        return { success: true, data: dashboard };
+    } catch (error) {
+        console.error("Dashboard Tracker Error:", error);
+        return { success: false, message: "Something went wrong.", data: null };
+    }
+};
+
 module.exports = {
     userLoginService,
     verifyOtpService,
@@ -703,4 +765,5 @@ module.exports = {
     editUserProfileService,
     acroReportService,
     blsAppointmentService,
+    dashboardProgressTrackerService
 }

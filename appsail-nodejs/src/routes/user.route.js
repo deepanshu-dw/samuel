@@ -15,5 +15,7 @@ router.put("/edit/:id", userController.editUserProfile);
 
 router.post("/bls/appointment", userController.blsAppointment);
 
+router.get("/dashboard/progress/:userId", userController.dashboardProgressTracker);
+
 
 module.exports = router;
