@@ -1,5 +1,5 @@
 const axios = require("axios");
-const { getAccessToken } = require("../config/zoho.config.js");
+const { getAccessToken } = require("../configs/zoho.config.js");
 
 async function getCRMData(moduleName = "Contacts", params = {}) {
   const token = await getAccessToken();
