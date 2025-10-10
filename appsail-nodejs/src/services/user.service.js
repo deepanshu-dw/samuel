@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 
 const userModel = require("../models/user.model");
 const otpModel = require("../models/otp.model");
+const documentModel = require("../models/document.model");
 
 // const userLoginService = async (loginId) => {
 //     try {
@@ -108,7 +109,37 @@ const generateOtp = () => Math.floor(100000 + Math.random() * 900000);
 const userLoginService = async (req) => {
     try {
         const { loginId } = req.body;
+        const tokens = await getAccessToken();
 
+        const criterias = `(Email:equals:${loginId})`;
+        const { data } = await axios.get(
+            `${process.env.ZOHO_API_BASE}/Contacts/search?criteria=${encodeURIComponent(criterias)}`,
+            {
+                headers: { Authorization: `Zoho-oauthtoken ${tokens}` },
+            }
+        );
+        console.log("data: ", data.data[0])
+        const module = "Contacts";
+
+        // Step 1: Make request to Zoho CRM to fetch fields
+        const response2 = await axios.get(
+            `https://www.zohoapis.eu/crm/v8/settings/fields?module=${module}`,
+            {
+                headers: {
+                    Authorization: `Zoho-oauthtoken ${tokens}`,
+                },
+            }
+        );
+
+        // Step 2: Extract field named "application_documents"
+        const fields = response2.data?.fields;
+        console.log("fields: ", fields)
+        return {
+            statusCode: 400,
+            message: "Email is required",
+            success: false,
+            data: fields,
+        };
         // 🔹 Step 1: Validate input
         if (!loginId) {
             return {
@@ -167,7 +198,9 @@ const userLoginService = async (req) => {
                         dropBoxFolderId: zohoUser.dropboxextension__Dropbox_Folder_ID,
                         status: zohoUser.Status || "Inactive",
                     });
+                    const newDoc = new documentModel({ userId: newUser._id })
                     user = await newUser.save();
+                    await newDoc.save();
                 } else {
                     return {
                         statusCode: 404,
