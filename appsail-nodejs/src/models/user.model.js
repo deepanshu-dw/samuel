@@ -1,7 +1,8 @@
 const mongoose = require("mongoose");
 // const bcrypt = require("bcrypt"); // official bcrypt
 
-const userSchema = new mongoose.Schema({
+const userSchema = new mongoose.Schema(
+  {
     firstName: { type: String, default: null },
     lastName: { type: String, default: null },
     fullName: { type: String, default: null },
@@ -17,8 +18,10 @@ const userSchema = new mongoose.Schema({
     passportNo: { type: String, default: null },
     dropBoxFolderId: { type: String, default: null },
     status: { type: String, default: "Active" },
-    active: { type: Boolean, default: false }
-}, { timestamps: true });
+    active: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
 
 // Hash password before saving
 // userSchema.pre("save", async function (next) {
