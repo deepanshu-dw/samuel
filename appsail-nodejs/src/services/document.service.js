@@ -84,7 +84,7 @@ const notificationModel = require("../models/notification.model.js");
 
 const uploadFileService = async (req) => {
     try {
-        const { userId } = req.params;
+        const { userId } = req.user;
         const { file } = req;
         const { type } = req.body;
 
@@ -154,7 +154,7 @@ const uploadFileService = async (req) => {
 
 const documentStatusService = async (req) => {
     try {
-        const { userId } = req.params;
+        const { userId } = req.user;
 
         if (!userId) {
             return {
@@ -216,9 +216,10 @@ const documentStatusService = async (req) => {
 
 const documentByTypeService = async (req) => {
     try {
-        const { userId, type } = req.params;
+        const { type } = req.params;
+        const { userId } = req.user;
 
-        if (!userId || typeof userId !== "string") {
+        if (!userId) {
             return { success: false, message: "A valid 'userId' is required.", data: null };
         }
 

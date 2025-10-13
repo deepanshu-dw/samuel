@@ -1,6 +1,7 @@
 const { getAccessToken } = require("../configs/zoho.config");
 
 const axios = require('axios');
+const jwt = require("jsonwebtoken");
 const bcrypt = require('bcrypt');
 
 
@@ -111,7 +112,6 @@ const userLoginService = async (req) => {
     try {
         const { loginId } = req.body;
 
-        // 🔹 Step 1: Validate input
         if (!loginId) {
             return {
                 statusCode: 400,
@@ -121,7 +121,6 @@ const userLoginService = async (req) => {
             };
         }
 
-        // 🔹 Step 2: Validate email format
         const isEmailValid = /\S+@\S+\.\S+/.test(loginId);
         if (!isEmailValid) {
             return {
@@ -134,85 +133,66 @@ const userLoginService = async (req) => {
 
         const email = loginId.toLowerCase();
 
-        // 🔹 Step 3: Check user in local DB
+        // 🔹 Check or create user in local DB
         let user = await userModel.findOne({ email, status: "Active" });
-
-        // 🔹 Step 4: If not found, fetch from Zoho CRM
         if (!user) {
-            try {
-                const token = await getAccessToken();
+            const token = await getAccessToken();
+            const criteria = `(Email:equals:${email})`;
+            const { data } = await axios.get(
+                `${process.env.ZOHO_API_BASE}/Contacts/search?criteria=${encodeURIComponent(criteria)}`,
+                { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
+            );
 
-                const criteria = `(Email:equals:${email})`;
-                const { data } = await axios.get(
-                    `${process.env.ZOHO_API_BASE}/Contacts/search?criteria=${encodeURIComponent(criteria)}`,
-                    {
-                        headers: { Authorization: `Zoho-oauthtoken ${token}` },
-                    }
-                );
-
-                if (data?.data?.length > 0) {
-                    const zohoUser = data.data[0];
-
-                    // 🟢 Step 4.1: Save user to local DB
-                    const newUser = new userModel({
-                        firstName: zohoUser.First_Name || null,
-                        lastName: zohoUser.Last_Name || null,
-                        fullName: zohoUser.Full_Name || null,
-                        email: zohoUser.Email || null,
-                        mobile: zohoUser.Mobile || zohoUser.Phone || null,
-                        nationality: zohoUser.Nationality || null,
-                        dateOfBirth: zohoUser.Date_of_Birth || null,
-                        zohoUserId: zohoUser.id,
-                        profileImage: zohoUser.Profile_Image || null,
-                        visaRefused: zohoUser.F_T_Turned_Down_No_Need || false,
-                        passportNo: zohoUser.Passport_Number || null,
-                        dropBoxFolderId: zohoUser.dropboxextension__Dropbox_Folder_ID,
-                        status: zohoUser.Status || "Inactive",
-                    });
-                    const newDoc = new documentModel({ userId: newUser._id })
-                    user = await newUser.save();
-                    await newDoc.save();
-                } else {
-                    return {
-                        statusCode: 404,
-                        message: "User not found.",
-                        success: false,
-                        data: null,
-                    };
-                }
-            } catch (zohoErr) {
-                console.error("Error fetching user from Zoho:", zohoErr.response?.data || zohoErr.message);
+            if (data?.data?.length > 0) {
+                const zohoUser = data.data[0];
+                const newUser = new userModel({
+                    firstName: zohoUser.First_Name || null,
+                    lastName: zohoUser.Last_Name || null,
+                    fullName: zohoUser.Full_Name || null,
+                    email: zohoUser.Email || null,
+                    mobile: zohoUser.Mobile || zohoUser.Phone || null,
+                    nationality: zohoUser.Nationality || null,
+                    dateOfBirth: zohoUser.Date_of_Birth || null,
+                    zohoUserId: zohoUser.id,
+                    profileImage: zohoUser.Profile_Image || null,
+                    visaRefused: zohoUser.F_T_Turned_Down_No_Need || false,
+                    passportNo: zohoUser.Passport_Number || null,
+                    dropBoxFolderId: zohoUser.dropboxextension__Dropbox_Folder_ID,
+                    status: zohoUser.Status || "Inactive",
+                });
+                const newDoc = new documentModel({ userId: newUser._id });
+                user = await newUser.save();
+                await newDoc.save();
+            } else {
                 return {
-                    statusCode: 500,
-                    message: "Error fetching user from Zoho CRM",
+                    statusCode: 404,
+                    message: "User not found",
                     success: false,
                     data: null,
                 };
             }
         }
 
-        // 🔹 Step 5: Generate OTP and upsert in DB
-        const otpValue = 123456 //generateOtp();
-
+        // 🔹 Generate OTP
+        const otpValue = 123456; // replace with generateOtp() in prod
         await otpModel.findOneAndUpdate(
             { email },
             { otp: otpValue },
             { new: true, upsert: true, setDefaultsOnInsert: true }
         );
 
-        // 🔹 Step 6: Return success response
         return {
             statusCode: 200,
-            message: "User found. Please verify using the OTP sent to your email.",
+            message: "OTP sent to your email",
             success: true,
             data: {
                 email,
-                otp: otpValue, // show for testing only
+                otp: otpValue, // for testing only
                 userId: user._id,
             },
         };
     } catch (error) {
-        console.error("Error in userLoginService:", error);
+        console.error("Login Service Error:", error);
         return {
             statusCode: 500,
             message: "Internal Server Error",
@@ -226,7 +206,6 @@ const verifyOtpService = async (req) => {
     try {
         const { email, otp } = req.body;
 
-        // 🧩 Step 1: Validate input
         if (!email || !otp) {
             return {
                 statusCode: 400,
@@ -236,7 +215,6 @@ const verifyOtpService = async (req) => {
             };
         }
 
-        // 🧩 Step 2: Check user existence
         const user = await userModel.findOne({ email: email.toLowerCase(), status: "Active" });
         if (!user) {
             return {
@@ -247,7 +225,6 @@ const verifyOtpService = async (req) => {
             };
         }
 
-        // 🧩 Step 3: Fetch OTP record
         const otpRecord = await otpModel.findOne({ email: email.toLowerCase() });
         if (!otpRecord) {
             return {
@@ -258,7 +235,6 @@ const verifyOtpService = async (req) => {
             };
         }
 
-        // 🧩 Step 4: Validate OTP
         if (otpRecord.otp !== Number(otp)) {
             return {
                 statusCode: 400,
@@ -268,26 +244,33 @@ const verifyOtpService = async (req) => {
             };
         }
 
-        // 🧩 Step 5: Delete only this OTP record (strict delete)
+        // 🔹 OTP is correct → delete OTP record
         await otpModel.deleteOne({ _id: otpRecord._id });
-        await userModel.findByIdAndUpdate(user._id, { active: true })
-        // 🧩 Step 6: Respond success
+
+        // 🔹 Generate JWT tokens
+        const payload = { userId: user._id, email: user.email };
+
+        const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "4h" });
+        const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET); // never expires
+
+        // Optionally store refresh token in DB
+        user.refreshToken = refreshToken;
+        await user.save();
+
         return {
             statusCode: 200,
             message: "OTP verified successfully",
             success: true,
             data: {
-                id: user._id,
+                userId: user._id,
                 fullName: user.fullName,
                 email: user.email,
-                phone: user.phone,
-                zohoUserId: user.zohoUserId,
-                status: user.status
+                accessToken,
+                refreshToken,
             }
         };
-
     } catch (error) {
-        console.error("Error verifying OTP:", error);
+        console.error("Verify OTP Service Error:", error);
         return {
             statusCode: 500,
             message: "Internal server error",
@@ -298,8 +281,7 @@ const verifyOtpService = async (req) => {
 };
 
 const getUserProfileService = async (req) => {
-    const { id } = req.params;
-
+    const id = req.user.userId;
     // 🔹 Step 1: Validate ID
     if (!id) {
         return {
@@ -346,7 +328,7 @@ const getUserProfileService = async (req) => {
 };
 
 const editUserProfileService = async (req) => {
-    const { id } = req.params;
+    const id = req.user.userId;
     const { dateOfBirth, nationality, passportNo, visaRefused } = req.body;
 
     // 🔹 Step 1: Validate user ID
@@ -516,10 +498,11 @@ const acroReportService = async (req) => {
 
 const blsAppointmentService = async (req) => {
     try {
-        const { userId, bookingDate, bookingTime } = req.body;
-
+        const { userId } = req.user;
+        const { bookingDate, bookingTime } = req.body;
+        console.log(userId)
         // 🔹 1. Validate input
-        if (!userId || typeof userId !== "string") {
+        if (!userId) {
             return {
                 statusCode: 400,
                 message: "A valid 'userId' is required.",
@@ -663,7 +646,7 @@ const blsAppointmentService = async (req) => {
 
 const dashboardProgressTrackerService = async (req) => {
     try {
-        const { userId } = req.params;
+        const { userId } = req.user;
         if (!userId) return { success: false, message: "User ID is required." };
 
         // Step 1: Find user
@@ -725,7 +708,7 @@ const dashboardProgressTrackerService = async (req) => {
 
 const getAllNotificationsService = async (req) => {
     try {
-        const { userId } = req.params;
+        const { userId } = req.user;
 
         if (!userId) {
             return { success: false, message: "User ID is required.", data: null };
