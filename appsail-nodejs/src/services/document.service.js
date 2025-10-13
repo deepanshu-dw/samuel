@@ -2,6 +2,7 @@ const { Dropbox } = require("dropbox");
 const userModel = require("../models/user.model.js");
 const documentModel = require("../models/document.model.js");
 const { uploadToDropbox } = require("../configs/dropbox.config.js");
+const notificationModel = require("../models/notification.model.js");
 
 // const dbx = new Dropbox({ accessToken: process.env.DROPBOX_REFRESH_TOKEN });
 
@@ -128,6 +129,13 @@ const uploadFileService = async (req) => {
             { $push: updateQuery },
             { upsert: true, new: true }
         );
+
+        await notificationModel.create({
+            userId,
+            title: "Document uploaded successfully.",
+            message: "Your document has beed collected successfully and admin will verify and update you soon."
+        });
+        //write notify code here.
 
         return {
             success: true,

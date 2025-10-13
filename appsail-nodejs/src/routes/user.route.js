@@ -17,5 +17,6 @@ router.post("/bls/appointment", userController.blsAppointment);
 
 router.get("/dashboard/progress/:userId", userController.dashboardProgressTracker);
 
+router.get("/notification/:userId", userController.getAllNotifications)
 
 module.exports = router;
