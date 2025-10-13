@@ -478,16 +478,70 @@ const editUserProfileService = async (req) => {
 };
 
 const acroReportService = async (req) => {
-    const token = await getAccessToken();
-    console.log("token: ", token);
-    // const response = await axios.get(
-    //     `${process.env.ZOHO_API_BASE}/settings/fields?module=Contacts`,
-    //     { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
-    // );
+    try {
+        const { userId } = req.body;
 
-    // console.log(response);
-    // return response;
-}
+        // 🔹 1. Validate input
+        if (!userId || typeof userId !== "string") {
+            return {
+                statusCode: 400,
+                message: "A valid 'userId' is required.",
+                data: null,
+                success: false
+            };
+        }
+
+        // 🔹 2. Check if user exists
+        const user = await userModel.findOne({ _id: userId, active: true });
+        if (!user) {
+            return {
+                statusCode: 404,
+                message: "User not found or inactive.",
+                data: null,
+                success: false
+            };
+        }
+
+        // 🔹 3. Check Police ACRO status in documentModel
+        const userDoc = await documentModel.findOne({ userId });
+
+        if (userDoc?.police_ACRO === "completed") {
+            return {
+                statusCode: 400,
+                message: "ACRO report already completed.",
+                data: null,
+                success: false
+            };
+        }
+
+        // 🔹 4. Update Police ACRO status to completed
+        await documentModel.findOneAndUpdate(
+            { userId },
+            { $set: { police_ACRO: "completed" } },
+            { upsert: true, new: true }
+        );
+
+        // 🔹 5. (Optional) Example: Use Zoho API if needed
+        // const token = await getAccessToken();
+        // console.log("token:", token);
+
+        return {
+            statusCode: 200,
+            message: "Police ACRO report marked as completed successfully.",
+            data: { userId, status: "completed" },
+            success: true
+        };
+
+    } catch (err) {
+        console.error("🔥 acroReportService Error:", err.response?.data || err.message);
+        return {
+            statusCode: 500,
+            message: "Internal server error while updating ACRO report.",
+            data: err.response?.data || null,
+            success: false
+        };
+    }
+};
 
 // const blsAppointmentService = async (req) => {
 //     const { userId, date } = req.body;

@@ -144,9 +144,115 @@ const uploadFileService = async (req) => {
     }
 };
 
+const documentStatusService = async (req) => {
+    try {
+        const { userId } = req.params;
 
-const getDocument = async (req) => {
-    //get document from here.
-}
+        if (!userId) {
+            return {
+                statusCode: 400,
+                message: "User ID is required.",
+                data: null,
+                success: false,
+            };
+        }
 
-module.exports = { uploadFileService };
+        // 🔹 1. Find document record
+        const userDocs = await documentModel.findOne({ userId });
+        if (!userDocs) {
+            return {
+                statusCode: 404,
+                message: "No document record found for this user.",
+                data: null,
+                success: false,
+            };
+        }
+
+        // 🔹 2. Define document fields (same as in your schema)
+        const docFields = [
+            "passport",
+            "proof_of_accomodation",
+            "proof_of_identity",
+            "passport_size_photo",
+            "bank_statement",
+            "health_insurance",
+            "criminal_record",
+            "employment_letter",
+            "travel_itinerary",
+        ];
+
+        // 🔹 3. Build status result
+        const statusResult = {};
+        for (const field of docFields) {
+            const files = userDocs[field] || [];
+            statusResult[field] = files.length > 0 ? "uploaded" : "pending";
+        }
+
+        return {
+            statusCode: 200,
+            message: "Document status fetched successfully.",
+            data: statusResult,
+            success: true,
+        };
+
+    } catch (error) {
+        console.error("🔥 getDocumentStatus Error:", error);
+        return {
+            statusCode: 500,
+            message: "Failed to fetch document status.",
+            data: null,
+            success: false,
+        };
+    }
+};
+
+const documentByTypeService = async (req) => {
+    try {
+        const { userId, type } = req.params;
+
+        if (!userId || typeof userId !== "string") {
+            return { success: false, message: "A valid 'userId' is required.", data: null };
+        }
+
+        if (!type || typeof type !== "string") {
+            return { success: false, message: "Document 'type' is required.", data: null };
+        }
+
+        // List of valid types (snake_case)
+        const validTypes = [
+            "passport",
+            "proof_of_accomodation",
+            "proof_of_identity",
+            "passport_size_photo",
+            "bank_statement",
+            "health_insurance",
+            "criminal_record",
+            "employment_letter",
+            "travel_itinerary",
+        ];
+
+        if (!validTypes.includes(type.toLowerCase())) {
+            return { success: false, message: "Invalid document type.", data: null };
+        }
+
+        // Fetch user document
+        const userDocs = await documentModel.findOne({ userId });
+        if (!userDocs) {
+            return { success: false, message: "No document record found for this user.", data: null };
+        }
+
+        const documentsArray = userDocs[type] || [];
+
+        return {
+            success: true,
+            message: `Documents fetched for '${type}'.`,
+            data: documentsArray,
+        };
+
+    } catch (error) {
+        console.error("🔥 getDocumentByTypeService Error:", error);
+        return { success: false, message: "Failed to fetch documents.", data: null };
+    }
+};
+
+module.exports = { uploadFileService, documentStatusService, documentByTypeService };

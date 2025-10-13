@@ -15,5 +15,7 @@ const documentController = require("../controllers/document.controller.js");
 
 // Single route for file upload
 router.post("/upload/:userId", upload.single("document"), documentController.uploadFile);
+router.get("/status/:userId", documentController.documentStatus);
+router.get("/type/:userId/:type", documentController.documentByType);
 
 module.exports = router;
