@@ -7,6 +7,7 @@ const bcrypt = require('bcrypt');
 const userModel = require("../models/user.model");
 const otpModel = require("../models/otp.model");
 const documentModel = require("../models/document.model");
+const notificationModel = require("../models/notification.model");
 
 // const userLoginService = async (loginId) => {
 //     try {
@@ -109,37 +110,7 @@ const generateOtp = () => Math.floor(100000 + Math.random() * 900000);
 const userLoginService = async (req) => {
     try {
         const { loginId } = req.body;
-        const tokens = await getAccessToken();
 
-        const criterias = `(Email:equals:${loginId})`;
-        const { data } = await axios.get(
-            `${process.env.ZOHO_API_BASE}/Contacts/search?criteria=${encodeURIComponent(criterias)}`,
-            {
-                headers: { Authorization: `Zoho-oauthtoken ${tokens}` },
-            }
-        );
-        console.log("data: ", data.data[0])
-        const module = "Contacts";
-
-        // Step 1: Make request to Zoho CRM to fetch fields
-        const response2 = await axios.get(
-            `https://www.zohoapis.eu/crm/v8/settings/fields?module=${module}`,
-            {
-                headers: {
-                    Authorization: `Zoho-oauthtoken ${tokens}`,
-                },
-            }
-        );
-
-        // Step 2: Extract field named "application_documents"
-        const fields = response2.data?.fields;
-        console.log("fields: ", fields)
-        return {
-            statusCode: 400,
-            message: "Email is required",
-            success: false,
-            data: fields,
-        };
         // 🔹 Step 1: Validate input
         if (!loginId) {
             return {
@@ -543,79 +514,6 @@ const acroReportService = async (req) => {
     }
 };
 
-// const blsAppointmentService = async (req) => {
-//     const { userId, date } = req.body;
-
-//     if (!userId || !date) {
-//         return {
-//             statusCode: 400,
-//             message: "userId and date are required",
-//             data: null,
-//             success: false
-//         };
-//     }
-//     console.log("userId, date: ", userId, date)
-//     const user = await userModel.findById(userId);
-//     console.log("user: ", user)
-//     if (!user) {
-//         return {
-//             statusCode: 404,
-//             message: "No user found",
-//             data: null,
-//             success: false
-//         };
-//     }
-
-//     try {
-//         const token = await getAccessToken();
-//         const response = await axios.post(`${process.env.ZOHO_API_BASE}/Tasks`, {
-//             data: [{
-//                 Subject: `${user.fullName} booked BLS Appointment`,
-//                 Due_Date: date,
-//                 // What_Id: { id: '45556000062001234' }, // Optional: related to Deal/Account
-//                 Who_Id: { id: user.zohoUserId }, // Optional: related Contact/Lead
-//                 // Owner: { id: '45556000059725012' }, // Task owner
-//                 Status: 'Not Started',
-//                 Priority: 'Normal',
-//                 Description: `Client has booken this appointment for ${date}`
-//             }]
-//         }, {
-//             headers: {
-//                 Authorization: `Zoho-oauthtoken ${token}`,
-//                 'Content-Type': 'application/json'
-//             }
-//         });
-
-//         const appointment = response.data?.data?.length ? response.data.data[0] : null;
-//         // let appointment = false
-//         if (!appointment) {
-//             return {
-//                 statusCode: 500,
-//                 message: "Failed to book appointment in Zoho",
-//                 data: null,
-//                 success: false
-//             };
-//         }
-
-//         return {
-//             statusCode: 200,
-//             message: "Appointment booked successfully",
-//             data: appointment,
-//             success: true
-//         };
-
-//     } catch (err) {
-//         console.log(err)
-//         // console.error("bookAppointmentService Error:", err.response?.data || err.message);
-//         return {
-//             statusCode: 500,
-//             message: "Internal server error",
-//             data: null,
-//             success: false
-//         };
-//     }
-// };
-
 const blsAppointmentService = async (req) => {
     try {
         const { userId, bookingDate, bookingTime } = req.body;
@@ -825,6 +723,29 @@ const dashboardProgressTrackerService = async (req) => {
     }
 };
 
+const getAllNotificationsService = async (req) => {
+    try {
+        const { userId } = req.params;
+
+        if (!userId) {
+            return { success: false, message: "User ID is required.", data: null };
+        }
+
+        // Fetch notifications for this user
+        const notifications = await notificationModel.find({ userId, status: "Active" })
+            .sort({ createdAt: -1 }); // newest first
+
+        return {
+            success: true,
+            message: "Notifications fetched successfully.",
+            data: notifications,
+        };
+    } catch (error) {
+        console.error("🔥 getAllNotificationsService Error:", error);
+        return { success: false, message: "Failed to fetch notifications.", data: null };
+    }
+};
+
 module.exports = {
     userLoginService,
     verifyOtpService,
@@ -832,5 +753,6 @@ module.exports = {
     editUserProfileService,
     acroReportService,
     blsAppointmentService,
-    dashboardProgressTrackerService
+    dashboardProgressTrackerService,
+    getAllNotificationsService
 }
