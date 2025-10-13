@@ -12,7 +12,7 @@ router.get("/profile", authMiddleware, userController.getUserProfile);
 
 router.put("/edit/profile", authMiddleware, userController.editUserProfile);
 
-// router.post("/acro/complete", userController.acroReport)
+router.post("/acro/complete", authMiddleware, userController.acroReport)
 
 router.post("/bls/appointment", authMiddleware, userController.blsAppointment);
 

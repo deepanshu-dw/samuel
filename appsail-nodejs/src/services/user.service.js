@@ -432,10 +432,10 @@ const editUserProfileService = async (req) => {
 
 const acroReportService = async (req) => {
     try {
-        const { userId } = req.body;
+        const { userId } = req.user;
 
         // 🔹 1. Validate input
-        if (!userId || typeof userId !== "string") {
+        if (!userId) {
             return {
                 statusCode: 400,
                 message: "A valid 'userId' is required.",
