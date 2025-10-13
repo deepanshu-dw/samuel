@@ -584,7 +584,7 @@ const blsAppointmentService = async (req) => {
                 success: false
             };
         }
-        // 🔹 2.5. Validate bookingTime (must be in HH:mm format, 24-hour)
+
         const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
         if (!bookingTime || !timeRegex.test(bookingTime)) {
             return {
@@ -595,7 +595,6 @@ const blsAppointmentService = async (req) => {
             };
         }
 
-        // ✅ Optional: Combine into full ISO datetime for storage or Zoho
         const combinedDateTime = new Date(`${bookingDate}T${bookingTime}:00.000Z`);
         if (isNaN(combinedDateTime.getTime())) {
             return {
@@ -605,9 +604,6 @@ const blsAppointmentService = async (req) => {
                 success: false
             };
         }
-
-
-        // console.log("📅 Booking BLS appointment for user:", userId, "on", bookingDate);
 
         // 🔹 2. Fetch user
         const user = await userModel.findOne({ _id: userId, active: true });
@@ -629,7 +625,18 @@ const blsAppointmentService = async (req) => {
             };
         }
 
-        // 🔹 3. Get Zoho Access Token
+        // 🔹 3. Check appointment status in documentModel
+        const userDocs = await documentModel.findOne({ userId });
+        if (userDocs?.bls_appointment === "completed") {
+            return {
+                statusCode: 400,
+                message: "Your appointment already booked.",
+                data: null,
+                success: false
+            };
+        }
+
+        // 🔹 4. Get Zoho Access Token
         const token = await getAccessToken();
         if (!token) {
             return {
@@ -640,7 +647,7 @@ const blsAppointmentService = async (req) => {
             };
         }
 
-        // 🔹 4. Build Zoho Task Payload
+        // 🔹 5. Build Zoho Task Payload
         const payload = {
             data: [
                 {
@@ -654,7 +661,7 @@ const blsAppointmentService = async (req) => {
             ]
         };
 
-        // 🔹 5. Send request to Zoho CRM
+        // 🔹 6. Send request to Zoho CRM
         const response = await axios.post(
             `${process.env.ZOHO_API_BASE}/Tasks`,
             payload,
@@ -677,6 +684,12 @@ const blsAppointmentService = async (req) => {
                 success: false
             };
         }
+
+        // 🔹 7. Update BLS appointment status in documentModel
+        await documentModel.findOneAndUpdate(
+            { userId },
+            { $set: { bls_appointment: "completed" } },
+        );
 
         return {
             statusCode: 200,
