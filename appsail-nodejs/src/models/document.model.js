@@ -15,17 +15,17 @@ const documentSchema = new mongoose.Schema({
         required: true,
         unique: true, // one record per user
     },
-    policeACRO: { type: String, default: "none" },
-    blsAppointment: { type: String, default: "none" },
+    police_ACRO: { type: String, default: "pending" },
+    bls_appointment: { type: String, default: "pending" },
     passport: { type: [fileInfoSchema], default: [] },
-    proofOfAccomodation: { type: [fileInfoSchema], default: [] },
-    proofOfIdentity: { type: [fileInfoSchema], default: [] },
-    passportSizePhoto: { type: [fileInfoSchema], default: [] },
-    bankStatement: { type: [fileInfoSchema], default: [] },
-    healthCertificate: { type: [fileInfoSchema], default: [] },
-    criminalRecord: { type: [fileInfoSchema], default: [] },
-    employmentLetter: { type: [fileInfoSchema], default: [] },
-    travelItinerary: { type: [fileInfoSchema], default: [] },
+    proof_of_accomodation: { type: [fileInfoSchema], default: [] },
+    proof_of_identity: { type: [fileInfoSchema], default: [] },
+    passport_size_photo: { type: [fileInfoSchema], default: [] },
+    bank_statement: { type: [fileInfoSchema], default: [] },
+    health_insurance: { type: [fileInfoSchema], default: [] },
+    criminal_record: { type: [fileInfoSchema], default: [] },
+    employment_letter: { type: [fileInfoSchema], default: [] },
+    travel_itinerary: { type: [fileInfoSchema], default: [] },
 }, { timestamps: true });
 
 module.exports = mongoose.model("UserDocument", documentSchema);

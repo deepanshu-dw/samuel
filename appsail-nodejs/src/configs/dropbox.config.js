@@ -43,4 +43,41 @@ async function getDropboxClient() {
     return new Dropbox({ accessToken: token });
 }
 
-module.exports = { getDropboxClient };
+const uploadToDropbox = async (folderId, type, file) => {
+    const dbx = await getDropboxClient();
+
+    // Validate folder
+    const folderMetadata = await dbx.filesGetMetadata({ path: folderId });
+    if (!folderMetadata?.result?.id) {
+        throw new Error("Invalid Dropbox folder. Contact admin.");
+    }
+
+    const { buffer, originalname } = file;
+    const folderName = type
+        .split("_")
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+    const dropboxPath = `${folderId}/${folderName}/${originalname}`;
+
+    // Upload
+    const uploadResponse = await dbx.filesUpload({
+        path: dropboxPath,
+        contents: buffer,
+        mode: "add",
+    });
+
+    // Generate link
+    const sharedLinkResponse = await dbx.sharingCreateSharedLinkWithSettings({
+        path: uploadResponse.result.path_lower,
+    });
+
+    return {
+        dropboxPath: uploadResponse.result.path_lower,
+        fileUrl: sharedLinkResponse.result.url.replace("?dl=0", "?dl=1"),
+        fileId: uploadResponse.result.id,
+        uploadedBy: "user",
+        uploadedAt: new Date(),
+    };
+};
+
+module.exports = { getDropboxClient, uploadToDropbox };
