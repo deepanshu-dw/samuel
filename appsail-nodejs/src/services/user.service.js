@@ -9,6 +9,7 @@ const userModel = require("../models/user.model");
 const otpModel = require("../models/otp.model");
 const documentModel = require("../models/document.model");
 const notificationModel = require("../models/notification.model");
+const { sendEmail } = require("../configs/email.config");
 
 // const userLoginService = async (loginId) => {
 //     try {
@@ -180,6 +181,22 @@ const userLoginService = async (req) => {
             { otp: otpValue },
             { new: true, upsert: true, setDefaultsOnInsert: true }
         );
+        const emailSent = await sendEmail(
+            email,
+            "Your OTP Code 🔒",
+            `<p>Hi ${user.fullName || "User"},</p>
+            <p>Your OTP for login is: <strong>${otpValue}</strong></p>
+            <p>If you did not request this, please ignore this email.</p>`
+        );
+
+        if (!emailSent) {
+            return {
+                statusCode: 500,
+                message: "Failed to send OTP email",
+                success: false,
+                data: null,
+            };
+        }
 
         return {
             statusCode: 200,
@@ -246,7 +263,7 @@ const verifyOtpService = async (req) => {
 
         // 🔹 OTP is correct → delete OTP record
         await otpModel.deleteOne({ _id: otpRecord._id });
-
+        await userModel.findByIdAndUpdate(user._id, { $set: { active: true } })
         // 🔹 Generate JWT tokens
         const payload = { userId: user._id, email: user.email };
 
@@ -313,7 +330,7 @@ const getUserProfileService = async (req) => {
         phone: user.phone || user.mobile || null,
         profileImage: user.profileImage?.url || null,
         nationality: user.nationality || null,
-        visaRefused: user.visaRefused || null,
+        visaRefused: user.visaRefused,
         dateOfBirth: user.dateOfBirth || null,
         passportNumber: user.passportNo || null,
     };
@@ -668,22 +685,37 @@ const dashboardProgressTrackerService = async (req) => {
         const documents = await documentModel.findOne({ userId });
         let uploadedDocsCount = 0;
         const totalDocs = 9; // Total expected docs
-
+        let policeACRO = "pending";
+        let bls = "pending";
+        let healthCertificate = "pending";
+        
         if (documents) {
             const docFields = [
                 "passport",
-                "proofOfAccomodation",
-                "proofOfIdentity",
-                "passportSizePhoto",
-                "bankStatement",
-                "healthCertificate",
-                "criminalRecord",
-                "employmentLetter",
-                "travelItinerary",
+                "proof_of_accomodation",
+                "proof_of_identity",
+                "passport_size_photo",
+                "bank_statement",
+                "health_insurance",
+                "criminal_record",
+                "employment_letter",
+                "travel_itinerary",
+                "police_ACRO",
+                "bls_appointment",
+                "health_certificate"
             ];
 
             docFields.forEach((field) => {
-                if (documents[field] && documents[field].length > 0) uploadedDocsCount++;
+                if (["police_ACRO", "bls_appointment", "health_certificate"].includes(field)) {
+                    if (documents[field]) {
+                        if (field === "police_ACRO") policeACRO = documents[field] || "pending";
+                        if (field === "bls_appointment") bls = documents[field] || "pending";
+                        if (field === "health_certificate") healthCertificate = documents[field] || "pending";
+                    }
+                } else {
+                    // Count uploaded documents for other fields
+                    if (documents[field] && documents[field].length > 0) uploadedDocsCount++;
+                }
             });
         }
 
@@ -692,9 +724,9 @@ const dashboardProgressTrackerService = async (req) => {
             userId: user._id,
             firstName: user.fullName.split(" ")[0] || "",
             profileSetup: profileComplete ? "completed" : "pending",
-            policeReport: "pending",
-            bls: "pending",
-            healthCertificate: "pending",
+            policeACRO,
+            bls,
+            healthCertificate,
             totalUploadedDoc: uploadedDocsCount,
             totalDoc: totalDocs,
         };
