@@ -1,8 +1,9 @@
-const { Dropbox } = require("dropbox");
+const axios = require("axios");
 const userModel = require("../models/user.model.js");
 const documentModel = require("../models/document.model.js");
 const { uploadToDropbox } = require("../configs/dropbox.config.js");
 const notificationModel = require("../models/notification.model.js");
+const { getAccessToken } = require("../configs/zoho.config.js");
 
 
 /**
@@ -10,6 +11,153 @@ const notificationModel = require("../models/notification.model.js");
  * @param {Object} file - req.file
  * @param {string} userId - user id from params
  */
+
+// const uploadFileService = async (req) => {
+//     try {
+//         const { userId } = req.user;
+//         const { file } = req;
+//         const { type } = req.body;
+
+//         if (!file) return { success: false, message: "No file uploaded.", data: null };
+//         if (!userId) return { success: false, message: "User ID is required.", data: null };
+//         if (!type) return { success: false, message: "Document type is required.", data: null };
+
+//         // 🧠 Step 1: Validate type
+//         const validTypes = [
+//             "passport",
+//             "proof_of_accomodation",
+//             "proof_of_identity",
+//             "passport_size_photo",
+//             "bank_statement",
+//             "health_insurance",
+//             "criminal_record",
+//             "employment_letter",
+//             "travel_itinerary",
+//         ];
+
+//         const normalizedType = type?.toLowerCase();
+
+//         if (!validTypes.includes(normalizedType)) {
+//             return { success: false, message: "Invalid document type.", data: null };
+//         }
+
+//         // Step 2: Check if user exists and active
+//         const user = await userModel.findOne({ _id: userId, active: true });
+//         if (!user) return { success: false, message: "User not found or inactive.", data: null };
+//         if (!user.dropBoxFolderId)
+//             return { success: false, message: "User has no Dropbox folder ID.", data: null };
+
+//         // Step 3: Upload to Dropbox
+//         const fileData = null;//await uploadToDropbox(user.dropBoxFolderId, normalizedType, file);
+
+//         // Step 4: Save to DB dynamically
+//         const updateQuery = {};
+//         updateQuery[normalizedType] = fileData;
+
+//         await documentModel.findOneAndUpdate(
+//             { userId },
+//             { $push: updateQuery },
+//             { upsert: true, new: true }
+//         );
+//         // 🧩 Step 4: Update Zoho CRM
+//         if (user.zohoUserId) {
+//             try {
+//                 const token = await getAccessToken();
+//                 const contactId = user.zohoUserId;
+
+//                 // Fetch existing contact data
+//                 const { data: zohoRes } = await axios.get(
+//                     `${process.env.ZOHO_API_BASE}/Contacts/${contactId}`,
+//                     {
+//                         headers: { Authorization: `Zoho-oauthtoken ${token}` },
+//                     }
+//                 );
+
+//                 const contact = zohoRes.data[0];
+//                 console.log(contact)
+//                 let applicationDocuments = contact.Application_Documents || [];
+//                 let supportingDocs = contact.Other_Residency_Info || "";
+
+//                 // Map of Application_Documents types
+//                 const applicationDocMap = {
+//                     criminal_record: "Criminal Record Check",
+//                     proof_of_accomodation: "Proof of Address (Rental)",
+//                     health_insurance: "Private Medical Insurance Policy Certificate",
+//                     bank_statement: "Bank Statements (last 12 months)",
+//                     proof_of_identity: "Health Certificate/s UK",
+//                 };
+
+//                 let updateNeeded = false;
+//                 let updatePayload = {};
+
+//                 if (applicationDocMap[normalizedType]) {
+//                     // This document belongs to Application_Documents
+//                     const docLabel = applicationDocMap[normalizedType];
+//                     if (!applicationDocuments.includes(docLabel)) {
+//                         applicationDocuments.push(docLabel);
+//                         updatePayload.Application_Documents = applicationDocuments;
+//                         updateNeeded = true;
+//                     }
+//                 } else {
+//                     // All others go to Other_Residency_Info (as a comma-separated string)
+//                     if (!supportingDocs.toLowerCase().includes(normalizedType)) {
+//                         supportingDocs = supportingDocs
+//                             ? `${supportingDocs}, ${normalizedType}`
+//                             : normalizedType;
+//                         updatePayload.Other_Residency_Info = supportingDocs;
+//                         updateNeeded = true;
+//                     }
+//                 }
+//                 // return {
+//                 //     statusCode: 200,
+//                 //     message: "Police ACRO report marked as completed successfully.",
+//                 //     data: { userId: applicationDocuments, status: supportingDocs, applicationDocMap, updateNeeded, updatePayload },
+//                 //     success: true
+//                 // };
+//                 if (updateNeeded) {
+//                     await axios.put(
+//                         `${process.env.ZOHO_API_BASE}/Contacts/${contactId}`,
+//                         { data: [updatePayload] },
+//                         {
+//                             headers: {
+//                                 Authorization: `Zoho-oauthtoken ${token}`,
+//                                 "Content-Type": "application/json",
+//                             },
+//                         }
+//                     );
+//                     console.log(`✅ Zoho CRM updated for ${normalizedType}`);
+//                 } else {
+//                     console.log(`ℹ️ No Zoho update needed for ${normalizedType}`);
+//                 }
+//             } catch (zohoErr) {
+//                 console.error(
+//                     "⚠️ Zoho update failed:",
+//                     zohoErr.response?.data || zohoErr.message
+//                 );
+//             }
+//         }
+
+//         await notificationModel.create({
+//             userId,
+//             title: "Document uploaded successfully.",
+//             message: "Your document has beed collected successfully and admin will verify and update you soon."
+//         });
+//         //write notify code here.
+
+//         return {
+//             success: true,
+//             message: `Document uploaded successfully.`,
+//             data: fileData,
+//         };
+//     } catch (error) {
+//         console.error("Dropbox Upload Error:", error);
+//         return {
+//             success: false,
+//             message: error?.error?.error_summary || "File upload failed.",
+//             data: null,
+//         };
+//     }
+// };
 
 const uploadFileService = async (req) => {
     try {
@@ -21,7 +169,6 @@ const uploadFileService = async (req) => {
         if (!userId) return { success: false, message: "User ID is required.", data: null };
         if (!type) return { success: false, message: "Document type is required.", data: null };
 
-        // 🧠 Step 1: Validate type
         const validTypes = [
             "passport",
             "proof_of_accomodation",
@@ -32,43 +179,125 @@ const uploadFileService = async (req) => {
             "criminal_record",
             "employment_letter",
             "travel_itinerary",
+            "health_certificate"
         ];
 
         const normalizedType = type?.toLowerCase();
-
         if (!validTypes.includes(normalizedType)) {
             return { success: false, message: "Invalid document type.", data: null };
         }
 
-        // Step 2: Check if user exists and active
+        // Step 1️⃣: Find active user
         const user = await userModel.findOne({ _id: userId, active: true });
         if (!user) return { success: false, message: "User not found or inactive.", data: null };
         if (!user.dropBoxFolderId)
             return { success: false, message: "User has no Dropbox folder ID.", data: null };
 
-        // Step 3: Upload to Dropbox
+        // Step 2️⃣: Upload to Dropbox
         const fileData = await uploadToDropbox(user.dropBoxFolderId, normalizedType, file);
 
-        // Step 4: Save to DB dynamically
+        // Step 3️⃣: Save to MongoDB
         const updateQuery = {};
         updateQuery[normalizedType] = fileData;
-
         await documentModel.findOneAndUpdate(
             { userId },
             { $push: updateQuery },
             { upsert: true, new: true }
         );
 
+        // Step 4️⃣: Sync with Zoho CRM (only if Zoho Contact ID exists)
+        if (user.zohoUserId) {
+            try {
+                const token = await getAccessToken();
+                const contactId = user.zohoUserId;
+
+                // Fetch existing contact
+                const { data: zohoRes } = await axios.get(
+                    `${process.env.ZOHO_API_BASE}/Contacts/${contactId}`,
+                    {
+                        headers: { Authorization: `Zoho-oauthtoken ${token}` },
+                    }
+                );
+
+                const contact = zohoRes.data[0];
+                let applicationDocuments = contact.Application_Documents || [];
+                let otherResidencyInfo = contact.Other_Residency_Info || "";
+
+                // Map of Application_Documents types
+                const applicationDocMap = {
+                    criminal_record: "Criminal Record Check",
+                    proof_of_accomodation: "Proof of Address (Rental)",
+                    health_insurance: "Private Medical Insurance Policy Certificate",
+                    bank_statement: "Bank Statements (last 12 months)",
+                    health_certificate: "Health Certificate/s UK",
+                };
+
+                let updateNeeded = false;
+                let updatePayload = {};
+
+                if (applicationDocMap[normalizedType]) {
+                    // Belongs to Application_Documents
+                    const docLabel = applicationDocMap[normalizedType];
+                    if (!applicationDocuments.includes(docLabel)) {
+                        applicationDocuments.push(docLabel);
+                        updatePayload.Application_Documents = applicationDocuments;
+                        updateNeeded = true;
+                    }
+                } else {
+                    // 🧩 Belongs to Other_Residency_Info
+                    const typeName = type
+                        .split("_")
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join(" ");
+
+                    const existingItems = otherResidencyInfo
+                        .split(",")
+                        .map(item => item.trim().toLowerCase())
+                        .filter(Boolean);
+
+                    if (!existingItems.includes(typeName.toLowerCase())) {
+                        const updatedList = otherResidencyInfo
+                            ? `${otherResidencyInfo}, ${typeName}`
+                            : typeName;
+                        updatePayload.Other_Residency_Info = updatedList;
+                        updateNeeded = true;
+                    }
+                }
+
+                if (updateNeeded) {
+                    await axios.put(
+                        `${process.env.ZOHO_API_BASE}/Contacts/${contactId}`,
+                        { data: [updatePayload] },
+                        {
+                            headers: {
+                                Authorization: `Zoho-oauthtoken ${token}`,
+                                "Content-Type": "application/json",
+                            },
+                        }
+                    );
+                    console.log(`✅ Zoho CRM updated for ${type}`);
+                } else {
+                    console.log(`ℹ️ No Zoho update needed for ${type}`);
+                }
+            } catch (zohoErr) {
+                console.error(
+                    "⚠️ Zoho update failed:",
+                    zohoErr.response?.data || zohoErr.message
+                );
+            }
+        }
+
+        // Step 5️⃣: Notify user
         await notificationModel.create({
             userId,
             title: "Document uploaded successfully.",
-            message: "Your document has beed collected successfully and admin will verify and update you soon."
+            message:
+                "Your document has been collected successfully. Admin will verify and update you soon.",
         });
-        //write notify code here.
 
         return {
             success: true,
-            message: `Document uploaded successfully.`,
+            message: "Document uploaded successfully.",
             data: fileData,
         };
     } catch (error) {
