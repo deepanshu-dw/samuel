@@ -488,12 +488,41 @@ const acroReportService = async (req) => {
         await documentModel.findOneAndUpdate(
             { userId },
             { $set: { police_ACRO: "completed" } },
-            { upsert: true, new: true }
         );
 
         // 🔹 5. (Optional) Example: Use Zoho API if needed
-        // const token = await getAccessToken();
-        // console.log("token:", token);
+        try {
+            const token = await getAccessToken(); // your token function
+            const contactId = user.zohoUserId;
+
+            if (!contactId) {
+                console.warn("Zoho Contact ID not found for user:", userId);
+            } else {
+                // 5a. Fetch existing contact data
+                const { data: zohoRes } = await axios.get(`${process.env.ZOHO_API_BASE}/Contacts/${contactId}`, {
+                    headers: { Authorization: `Zoho-oauthtoken ${token}` }
+                });
+
+                const contact = zohoRes.data[0];
+                let applicationDocuments = contact.Application_Documents || [];
+
+                // 5b. Append POLICE ACRO REPORT if not already present
+                if (!applicationDocuments.includes("Police ACRO Report")) {
+                    applicationDocuments.push("Police ACRO Report");
+                    // 5c. Update Zoho contact
+                    await axios.put(`${process.env.ZOHO_API_BASE}/Contacts/${contactId}`, {
+                        data: [{ Application_Documents: applicationDocuments }]
+                    }, {
+                        headers: {
+                            Authorization: `Zoho-oauthtoken ${token}`,
+                            "Content-Type": "application/json"
+                        }
+                    });
+                }
+            }
+        } catch (zohoErr) {
+            console.error("⚠️ Zoho update failed:", zohoErr.response?.data || zohoErr.message);
+        }
 
         return {
             statusCode: 200,
