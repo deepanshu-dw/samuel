@@ -17,6 +17,7 @@ const documentSchema = new mongoose.Schema({
     },
     police_ACRO: { type: String, default: "pending" },
     bls_appointment: { type: String, default: "pending" },
+    health_certificate: { type: String, default: "pending" },
     passport: { type: [fileInfoSchema], default: [] },
     proof_of_accomodation: { type: [fileInfoSchema], default: [] },
     proof_of_identity: { type: [fileInfoSchema], default: [] },
