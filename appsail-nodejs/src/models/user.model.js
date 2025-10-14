@@ -1,24 +1,25 @@
 const mongoose = require("mongoose");
 // const bcrypt = require("bcrypt"); // official bcrypt
 
-const userSchema = new mongoose.Schema({
-  firstName: { type: String, default: null },
-  lastName: { type: String, default: null },
-  fullName: { type: String, default: null },
-  email: { type: String, trim: true, unique: true },
-  mobile: { type: String, trim: true },
-  // password: { type: String, required: true },
-  nationality: { type: String, default: null },
-  dateOfBirth: { type: String, default: null },
-  // gender: { type: String, default: null },
-  zohoUserId: { type: String, required: true, unique: true },
-  profileImage: { type: String, default: null },
-  visaRefused: { type: Boolean, default: false },
-  passportNo: { type: String, default: null },
-  dropBoxFolderId: { type: String, default: "" },
-  status: { type: String, default: "Active" },
-  active: { type: Boolean, default: false },
-},
+const userSchema = new mongoose.Schema(
+  {
+    firstName: { type: String, default: null },
+    lastName: { type: String, default: null },
+    fullName: { type: String, default: null },
+    email: { type: String, trim: true, unique: true },
+    mobile: { type: String, trim: true },
+    // password: { type: String, required: true },
+    nationality: { type: String, default: null },
+    dateOfBirth: { type: String, default: null },
+    // gender: { type: String, default: null },
+    zohoUserId: { type: String, required: true, unique: true },
+    profileImage: { type: String, default: null },
+    visaRefused: { type: Boolean, default: false },
+    passportNo: { type: String, default: null },
+    dropBoxFolderId: { type: String, default: "" },
+    status: { type: String, default: "Active" },
+    active: { type: Boolean, default: false },
+  },
   { timestamps: true }
 );
 
