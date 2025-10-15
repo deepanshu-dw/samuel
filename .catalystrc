@@ -14,7 +14,7 @@
       "name": "VisaTracking",
       "domain": {
         "id": "30036629332",
-        "name": "visatracking.development"
+        "name": "src-30036629332.development"
       },
       "timezone": "Asia/Kolkata",
       "env": [

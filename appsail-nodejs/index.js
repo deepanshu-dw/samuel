@@ -9,7 +9,9 @@ const documentRoutes = require("./src/routes/document.route.js");
 const dropboxRoutes = require("./src/routes/dropbox.route.js");
 
 const app = express();
-const port = process.env.X_ZOHO_CATALYST_LISTEN_PORT || 9000;
+// const port = process.env.X_ZOHO_CATALYST_LISTEN_PORT || 9000;
+const port = process.env.X_ZOHO_CATALYST_LISTEN_PORT || process.env.PORT || 9000;
+
 
 app.use(express.json());
 // console.log("✅ userRoutes:", userRoutes);
@@ -17,7 +19,7 @@ app.use(express.json());
 app.use("/api/users", userRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/zoho", zohoRoutes);
-app.use("/api/chat", chatRoutes);
+// app.use("/api/chat", chatRoutes);
 app.use("/api/dropbox", dropboxRoutes);
 
 app.get("/", (req, res) => {
